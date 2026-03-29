@@ -34,7 +34,7 @@ class HomeView extends StatelessWidget {
                   width: MediaQuery.of(context).size.width * 0.95,
                   child: Container(
                     decoration: const BoxDecoration(
-                      color: AppColors.surface, // Fond blanc uniquement
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.all(Radius.circular(20)),
                     ),
                     padding: const EdgeInsets.symmetric(
@@ -45,7 +45,7 @@ class HomeView extends StatelessWidget {
                       children: [
                         // ── Bouton Ajouter une dépense ─────
                         ElevatedButton.icon(
-                          onPressed: () => context.go('/add-depense'),
+                          onPressed: () => context.push('/add-depense'),
                           icon: const Icon(Icons.add),
                           label: const Text('Dépense'),
                           style: ElevatedButton.styleFrom(
@@ -61,7 +61,7 @@ class HomeView extends StatelessWidget {
                         const SizedBox(height: 12),
 
                         ElevatedButton.icon(
-                          onPressed: () => context.go('/stats'),
+                          onPressed: () => context.push('/stats'),
                           icon: const Icon(Icons.bar_chart),
                           label: const Text('Statistiques'),
                           style: ElevatedButton.styleFrom(
@@ -77,7 +77,7 @@ class HomeView extends StatelessWidget {
                         const SizedBox(height: 12),
 
                         ElevatedButton.icon(
-                          onPressed: () => context.go('/import'),
+                          onPressed: () => context.push('/import'),
                           icon: const Icon(Icons.import_export),
                           label: const Text('Import / Export CSV'),
                           style: ElevatedButton.styleFrom(

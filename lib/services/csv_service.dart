@@ -42,6 +42,11 @@ class CsvService {
     depenses.add(depense);
     await _writeAll(depenses);
   }
+
+  static Future<void> replaceAll(List<Depense> depenses) async {
+    await _writeAll(depenses);
+  }
+
   static Future<List<Depense>> getSuggestions(String query) async {
     final depenses = await readAll();
     final seen = <String>{};

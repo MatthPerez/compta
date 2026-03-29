@@ -107,9 +107,7 @@ class _ImportViewState extends State<ImportView> {
 
     setState(() => _loading = true);
 
-    for (final d in valides) {
-      await CsvService.add(d);
-    }
+    await CsvService.replaceAll(valides);
 
     // Recharger la preview
     await _loadPreview();
