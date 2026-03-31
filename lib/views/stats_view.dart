@@ -20,6 +20,9 @@ class _StatsViewState extends State<StatsView> {
   int? _selectedYear;
   int? _selectedMonth;
 
+  // ── Catégories déployées ─────────────────────────────────
+  final Set<String> _expandedCategories = {};
+
   final List<Color> _palette = const [
     Color(0xFF6C63FF),
     Color(0xFF9C94FF),
@@ -60,14 +63,12 @@ class _StatsViewState extends State<StatsView> {
     });
   }
 
-  // ── Années disponibles ───────────────────────────────────
   List<int> get _anneesDisponibles {
     final years = _depenses.map((d) => d.date.year).toSet().toList();
     years.sort();
     return years;
   }
 
-  // ── Mois disponibles selon l'année sélectionnée ──────────
   List<int> get _moisDisponibles {
     final source = _selectedYear == null
         ? _depenses
@@ -77,7 +78,6 @@ class _StatsViewState extends State<StatsView> {
     return months;
   }
 
-  // ── Dépenses filtrées ────────────────────────────────────
   List<Depense> get _depensesFiltrees {
     return _depenses.where((d) {
       if (_selectedYear != null && d.date.year != _selectedYear) return false;
@@ -87,7 +87,23 @@ class _StatsViewState extends State<StatsView> {
     }).toList();
   }
 
-  // ── Stats par catégorie ──────────────────────────────────
+  List<Depense> get _loyersAnnee {
+    final source = _selectedYear == null
+        ? _depenses
+        : _depenses.where((d) => d.date.year == _selectedYear).toList();
+    final loyers = source
+        .where((d) => d.designation.toLowerCase().contains('loyer'))
+        .toList();
+    loyers.sort((a, b) => a.date.compareTo(b.date));
+    return loyers;
+  }
+
+  double get _totalLoyers {
+    final loyers = _loyersAnnee;
+    if (loyers.isEmpty) return 0;
+    return loyers.map((d) => d.valeur).reduce((a, b) => a + b);
+  }
+
   Map<String, List<Depense>> _parCategorie(List<Depense> liste) {
     final map = <String, List<Depense>>{};
     for (final d in liste) {
@@ -112,17 +128,75 @@ class _StatsViewState extends State<StatsView> {
     return f.isEmpty ? 0 : f.map((d) => d.valeur).reduce((a, b) => a + b);
   }
 
-  // ── Titre de la période sélectionnée ────────────────────
   String get _titrePeriode {
     if (_selectedYear == null) return 'Toutes périodes';
     if (_selectedMonth == null) return '$_selectedYear';
     return '${_moisLabels[_selectedMonth! - 1]} $_selectedYear';
   }
 
+  String get _titreAnneeLoyers {
+    if (_selectedYear == null) return 'Toutes périodes';
+    return '$_selectedYear';
+  }
+
+  // ── Bloc période figé ────────────────────────────────────
+  Widget _buildPeriodeBar() {
+    return Material(
+      color: AppColors.background,
+      elevation: 4,
+      shadowColor: AppColors.primary.withValues(alpha: 0.10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<int?>(
+                value: _selectedYear,
+                decoration: _dropDecoration('Année'),
+                dropdownColor: AppColors.surface,
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Toutes')),
+                  ..._anneesDisponibles.map(
+                    (y) => DropdownMenuItem(value: y, child: Text('$y')),
+                  ),
+                ],
+                onChanged: (val) => setState(() {
+                  _selectedYear = val;
+                  _selectedMonth = null;
+                }),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonFormField<int?>(
+                value: _selectedMonth,
+                decoration: _dropDecoration('Mois'),
+                dropdownColor: AppColors.surface,
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Tous')),
+                  ..._moisDisponibles.map(
+                    (m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(_moisLabels[m - 1]),
+                    ),
+                  ),
+                ],
+                onChanged: _selectedYear == null
+                    ? null
+                    : (val) => setState(() => _selectedMonth = val),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filtrees = _depensesFiltrees;
     final categories = _parCategorie(filtrees);
+    final loyers = _loyersAnnee;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -145,219 +219,36 @@ class _StatsViewState extends State<StatsView> {
                 style: TextStyle(color: AppColors.textSecondary),
               ),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // ── Sélecteurs période ───────────────
-                  _card(
+          : Column(
+              children: [
+                // ── Bloc période figé ────────────────
+                _buildPeriodeBar(),
+
+                // ── Contenu scrollable ───────────────
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text(
-                          'Période',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            // Sélecteur année
-                            Expanded(
-                              child: DropdownButtonFormField<int?>(
-                                value: _selectedYear,
-                                decoration: _dropDecoration('Année'),
-                                dropdownColor: AppColors.surface,
-                                items: [
-                                  const DropdownMenuItem(
-                                    value: null,
-                                    child: Text('Toutes'),
-                                  ),
-                                  ..._anneesDisponibles.map(
-                                    (y) => DropdownMenuItem(
-                                      value: y,
-                                      child: Text('$y'),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (val) => setState(() {
-                                  _selectedYear = val;
-                                  _selectedMonth = null;
-                                }),
-                              ),
-                            ),
-
-                            const SizedBox(width: 12),
-
-                            // Sélecteur mois
-                            Expanded(
-                              child: DropdownButtonFormField<int?>(
-                                value: _selectedMonth,
-                                decoration: _dropDecoration('Mois'),
-                                dropdownColor: AppColors.surface,
-                                items: [
-                                  const DropdownMenuItem(
-                                    value: null,
-                                    child: Text('Tous'),
-                                  ),
-                                  ..._moisDisponibles.map(
-                                    (m) => DropdownMenuItem(
-                                      value: m,
-                                      child: Text(_moisLabels[m - 1]),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: _selectedYear == null
-                                    ? null
-                                    : (val) =>
-                                          setState(() => _selectedMonth = val),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // ── Total période ────────────────────
-                  _card(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Total',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            Text(
-                              _titrePeriode,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${_totalGeneral.toStringAsFixed(2)} €',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // ── Graphique camembert ──────────────
-                  if (filtrees.isNotEmpty) ...[
-                    _card(
-                      child: Column(
-                        children: [
-                          Text(
-                            'Répartition — $_titrePeriode',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            height: 240,
-                            child: PieChart(
-                              PieChartData(
-                                sectionsSpace: 3,
-                                centerSpaceRadius: 48,
-                                pieTouchData: PieTouchData(
-                                  touchCallback: (event, response) {
-                                    setState(() {
-                                      _touchedIndex = response
-                                          ?.touchedSection
-                                          ?.touchedSectionIndex;
-                                    });
-                                  },
-                                ),
-                                sections: _buildSections(
-                                  categories,
-                                  _totalGeneral,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Wrap(
-                            spacing: 12,
-                            runSpacing: 8,
-                            children: categories.keys
-                                .toList()
-                                .asMap()
-                                .entries
-                                .map(
-                                  (e) => _legendItem(
-                                    e.value,
-                                    _palette[e.key % _palette.length],
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // ── Stats par catégorie ──────────
-                    ...categories.entries.map((entry) {
-                      final cat = entry.key;
-                      final list = entry.value;
-                      final index = categories.keys.toList().indexOf(cat);
-                      final color = _palette[index % _palette.length];
-
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _card(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        // ── Total période ────────────
+                        _card(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // En-tête
-                              Row(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 14,
-                                    height: 14,
-                                    decoration: BoxDecoration(
-                                      color: color,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    cat,
+                                  const Text(
+                                    'Total',
                                     style: TextStyle(
-                                      fontSize: 15,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.bold,
-                                      color: color,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
-                                  const Spacer(),
                                   Text(
-                                    '${list.length} dépense${list.length > 1 ? 's' : ''}',
+                                    _titrePeriode,
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textSecondary,
@@ -365,77 +256,448 @@ class _StatsViewState extends State<StatsView> {
                                   ),
                                 ],
                               ),
-
-                              const Divider(height: 20),
-
-                              // Min / Moy / Max / Total
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceAround,
-                                children: [
-                                  _statItem('Min', _min(list)),
-                                  _statItem('Moy', _moy(list)),
-                                  _statItem('Max', _max(list)),
-                                  _statItem('Total', _total(list), bold: true),
-                                ],
-                              ),
-
-                              const Divider(height: 20),
-
-                              // Liste dépenses
-                              ...list.map(
-                                (d) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 3,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          d.designation,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${d.valeur.toStringAsFixed(2)} €',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              Text(
+                                '${_totalGeneral.toStringAsFixed(2)} €',
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      );
-                    }),
-                  ] else
-                    _card(
-                      child: Center(
-                        child: Text(
-                          'Aucune dépense pour $_titrePeriode.',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
+
+                        const SizedBox(height: 16),
+
+                        if (filtrees.isNotEmpty) ...[
+                          // ── Graphique camembert ──────
+                          _card(
+                            child: Column(
+                              children: [
+                                Text(
+                                  'Répartition — $_titrePeriode',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                SizedBox(
+                                  height: 240,
+                                  child: PieChart(
+                                    PieChartData(
+                                      sectionsSpace: 3,
+                                      centerSpaceRadius: 48,
+                                      pieTouchData: PieTouchData(
+                                        touchCallback: (event, response) {
+                                          setState(() {
+                                            _touchedIndex = response
+                                                ?.touchedSection
+                                                ?.touchedSectionIndex;
+                                          });
+                                        },
+                                      ),
+                                      sections: _buildSections(
+                                        categories,
+                                        _totalGeneral,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Wrap(
+                                  spacing: 12,
+                                  runSpacing: 8,
+                                  children: categories.keys
+                                      .toList()
+                                      .asMap()
+                                      .entries
+                                      .map(
+                                        (e) => _legendItem(
+                                          e.value,
+                                          _palette[e.key % _palette.length],
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // ── Blocs catégorie déployables ──
+                          ...categories.entries.map((entry) {
+                            final cat = entry.key;
+                            final list = entry.value;
+                            final index = categories.keys.toList().indexOf(cat);
+                            final color = _palette[index % _palette.length];
+                            final isExpanded = _expandedCategories.contains(
+                              cat,
+                            );
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _card(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // ── En-tête cliquable ──
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(8),
+                                      onTap: () => setState(() {
+                                        if (isExpanded) {
+                                          _expandedCategories.remove(cat);
+                                        } else {
+                                          _expandedCategories.add(cat);
+                                        }
+                                      }),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 14,
+                                            height: 14,
+                                            decoration: BoxDecoration(
+                                              color: color,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            cat,
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: color,
+                                            ),
+                                          ),
+                                          const Spacer(),
+                                          Text(
+                                            '${list.length} dépense${list.length > 1 ? 's' : ''}',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppColors.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '${_total(list).toStringAsFixed(2)} €',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: color,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          AnimatedRotation(
+                                            turns: isExpanded ? 0.5 : 0,
+                                            duration: const Duration(
+                                              milliseconds: 250,
+                                            ),
+                                            child: Icon(
+                                              Icons.keyboard_arrow_down,
+                                              color: color,
+                                              size: 20,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    // ── Contenu déployable ──
+                                    AnimatedCrossFade(
+                                      firstChild: const SizedBox(
+                                        width: double.infinity,
+                                      ),
+                                      secondChild: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Divider(height: 20),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceAround,
+                                            children: [
+                                              _statItem('Min', _min(list)),
+                                              _statItem('Moy', _moy(list)),
+                                              _statItem('Max', _max(list)),
+                                              _statItem(
+                                                'Total',
+                                                _total(list),
+                                                bold: true,
+                                              ),
+                                            ],
+                                          ),
+                                          const Divider(height: 20),
+                                          ...list.map(
+                                            (d) => Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 3,
+                                                  ),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      d.designation,
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        color: AppColors
+                                                            .textPrimary,
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    '${d.valeur.toStringAsFixed(2)} €',
+                                                    style: const TextStyle(
+                                                      fontSize: 13,
+                                                      color: AppColors
+                                                          .textSecondary,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      crossFadeState: isExpanded
+                                          ? CrossFadeState.showSecond
+                                          : CrossFadeState.showFirst,
+                                      duration: const Duration(
+                                        milliseconds: 250,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }),
+                        ] else
+                          _card(
+                            child: Center(
+                              child: Text(
+                                'Aucune dépense pour $_titrePeriode.',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        const SizedBox(height: 16),
+
+                        // ── Tableau récapitulatif des loyers ─
+                        _card(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.home_outlined,
+                                    color: AppColors.primary,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Loyers — $_titreAnneeLoyers',
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              loyers.isEmpty
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                        child: Text(
+                                          'Aucun loyer trouvé pour $_titreAnneeLoyers.',
+                                          style: const TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : Column(
+                                      children: [
+                                        Container(
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withValues(
+                                              alpha: 0.08,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          child: const Row(
+                                            children: [
+                                              SizedBox(
+                                                width: 90,
+                                                child: Text(
+                                                  'Date',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: Text(
+                                                  'Désignation',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                width: 80,
+                                                child: Text(
+                                                  'Montant',
+                                                  textAlign: TextAlign.right,
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        ...loyers.asMap().entries.map((entry) {
+                                          final i = entry.key;
+                                          final d = entry.value;
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: i.isEven
+                                                  ? Colors.transparent
+                                                  : AppColors.primary
+                                                        .withValues(
+                                                          alpha: 0.03,
+                                                        ),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 90,
+                                                  child: Text(
+                                                    '${d.date.day.toString().padLeft(2, '0')}/'
+                                                    '${d.date.month.toString().padLeft(2, '0')}/'
+                                                    '${d.date.year}',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: AppColors
+                                                          .textSecondary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                Expanded(
+                                                  child: Text(
+                                                    d.designation,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color:
+                                                          AppColors.textPrimary,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 80,
+                                                  child: Text(
+                                                    '${d.valeur.toStringAsFixed(2)} €',
+                                                    textAlign: TextAlign.right,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color:
+                                                          AppColors.textPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }),
+                                        const Divider(height: 16),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 4,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const SizedBox(width: 90),
+                                              const Expanded(
+                                                child: Text(
+                                                  'Total loyers',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color:
+                                                        AppColors.textPrimary,
+                                                  ),
+                                                ),
+                                              ),
+                                              SizedBox(
+                                                width: 80,
+                                                child: Text(
+                                                  '${_totalLoyers.toStringAsFixed(2)} €',
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ],
                           ),
                         ),
-                      ),
+
+                        const SizedBox(height: 16),
+                      ],
                     ),
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
     );
   }
 
-  // ── Sections camembert ───────────────────────────────────
   List<PieChartSectionData> _buildSections(
     Map<String, List<Depense>> categories,
     double total,
@@ -481,7 +743,6 @@ class _StatsViewState extends State<StatsView> {
     }).toList();
   }
 
-  // ── Carte ────────────────────────────────────────────────
   Widget _card({required Widget child}) {
     return Container(
       width: double.infinity,
@@ -501,7 +762,6 @@ class _StatsViewState extends State<StatsView> {
     );
   }
 
-  // ── Stat item ────────────────────────────────────────────
   Widget _statItem(String label, double value, {bool bold = false}) {
     return Column(
       children: [
@@ -522,7 +782,6 @@ class _StatsViewState extends State<StatsView> {
     );
   }
 
-  // ── Légende ──────────────────────────────────────────────
   Widget _legendItem(String label, Color color) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -541,7 +800,6 @@ class _StatsViewState extends State<StatsView> {
     );
   }
 
-  // ── Décoration dropdown ──────────────────────────────────
   InputDecoration _dropDecoration(String label) {
     return InputDecoration(
       labelText: label,
