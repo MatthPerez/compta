@@ -20,6 +20,12 @@ class _ImportExportTabState extends State<ImportExportTab> {
     _export();
   }
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Future<void> _export() async {
     final transactions = await CsvService.readAllTransactions();
     final lines = transactions.map((t) => t.toCsv()).toList();
@@ -42,9 +48,14 @@ class _ImportExportTabState extends State<ImportExportTab> {
         transactions.add(Transaction.fromCsv(line));
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Erreur de format: $line')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Erreur de format: $line\nFormat attendu: TYPE|DATE|DÉSIGNATION|MONTANT|CATÉGORIE',
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
       }
     }
@@ -56,7 +67,7 @@ class _ImportExportTabState extends State<ImportExportTab> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Données mises à jour')));
-      await _export(); // Rafraîchir l'export après la mise à jour
+      await _export();
     }
   }
 
@@ -75,7 +86,6 @@ class _ImportExportTabState extends State<ImportExportTab> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Bloc texte pour afficher les données CSV (petite police, hauteur limitée + scroll)
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -86,20 +96,20 @@ class _ImportExportTabState extends State<ImportExportTab> {
                 child: TextField(
                   controller: _controller,
                   maxLines: null,
-                  style: const TextStyle(
-                    fontSize: 12,
-                  ), // Petite taille de police
+                  style: const TextStyle(fontSize: 12),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.all(8),
+                    hintText: 'TYPE|DATE|DÉSIGNATION|MONTANT|CATÉGORIE',
                   ),
+                  enabled: true,
+                  keyboardType: TextInputType.multiline,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 16),
 
-          // 2 boutons alignés horizontalement
           Row(
             children: [
               Expanded(
@@ -113,7 +123,11 @@ class _ImportExportTabState extends State<ImportExportTab> {
                 child: ElevatedButton(
                   onPressed: _loading ? null : _updateData,
                   child: _loading
-                      ? const CircularProgressIndicator()
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Text('Mettre à jour'),
                 ),
               ),

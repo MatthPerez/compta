@@ -11,25 +11,19 @@ class HomeView extends StatelessWidget {
         child: SingleChildScrollView(
           child: Column(
             children: [
-              // Image en haut de l'écran (moitié haute, 75% de la largeur)
               SizedBox(
                 width: MediaQuery.of(context).size.width * 0.75,
                 height: MediaQuery.of(context).size.height * 0.4,
                 child: Center(
-                  // <-- Centre l'image horizontalement
                   child: Image.asset(
                     'lib/assets/pics/cochon_finances.png',
-                    fit: BoxFit
-                        .contain, // <-- Affiche l'image en entier (sans recadrage)
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
-              const SizedBox(
-                height: 20,
-              ), // Espacement entre l'image et le bloc de boutons
-              // Bloc de boutons
+
               const SizedBox(height: 40),
-              // Bloc avec les boutons
+              
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
