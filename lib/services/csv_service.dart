@@ -1,62 +1,118 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import '../models/depense.dart';
+import '../models/transaction.dart';
+import '../models/category.dart' as custom_category;
 
 class CsvService {
-  CsvService._();
+  static const String _dataFileName = 'compta.csv';
+  static const String _categoriesFileName = 'categories.csv';
+  static late Directory _datasDir;
+  static late File _dataFile;
+  static late File _categoriesFile;
 
-  static const String _fileName = 'compta.csv';
-
-  static Future<File> get _file async {
+  static Future<void> _init() async {
     final dir = await getApplicationDocumentsDirectory();
-    return File('${dir.path}/$_fileName');
-  }
-
-  static Future<List<Depense>> readAll() async {
-    try {
-      final file = await _file;
-      if (!await file.exists()) return [];
-      final lines = await file.readAsLines();
-      return lines
-          .where((line) => line.trim().isNotEmpty)
-          .map((line) => Depense.fromCsv(line))
-          .toList();
-    } catch (_) {
-      return [];
+    _datasDir = Directory('${dir.path}/datas');
+    if (!await _datasDir.exists()) {
+      await _datasDir.create(recursive: true);
     }
+    _dataFile = File('${_datasDir.path}/$_dataFileName');
+    _categoriesFile = File('${_datasDir.path}/$_categoriesFileName');
   }
 
-  static Future<void> _writeAll(List<Depense> depenses) async {
-    final file = await _file;
-    depenses.sort((a, b) {
-      final dateComp = a.date.compareTo(b.date);
-      if (dateComp != 0) return dateComp;
-      return a.designation.toLowerCase().compareTo(b.designation.toLowerCase());
-    });
-    final lines = depenses.map((d) => d.toCsv()).join('\n');
-    await file.writeAsString(lines);
-  }
+  static Future<List<Transaction>> readAllTransactions() async {
+    await _init();
+    if (!await _dataFile.exists()) return [];
 
-  static Future<void> add(Depense depense) async {
-    final depenses = await readAll();
-    depenses.add(depense);
-    await _writeAll(depenses);
-  }
+    final lines = await _dataFile.readAsLines();
+    final transactions = <Transaction>[];
 
-  static Future<void> replaceAll(List<Depense> depenses) async {
-    await _writeAll(depenses);
-  }
-
-  static Future<List<Depense>> getSuggestions(String query) async {
-    final depenses = await readAll();
-    final seen = <String>{};
-    final unique = <Depense>[];
-    for (final d in depenses) {
-      if (d.designation.toLowerCase().contains(query.toLowerCase()) &&
-          seen.add(d.designation.toLowerCase())) {
-        unique.add(d);
+    for (final line in lines) {
+      if (line.trim().isEmpty) continue;
+      try {
+        transactions.add(Transaction.fromCsv(line));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Erreur de lecture de la ligne: $line');
+        }
       }
     }
-    return unique;
+
+    return transactions;
+  }
+
+  static Future<void> addTransaction(Transaction t) async {
+    await _init();
+    await _dataFile.writeAsString('${t.toCsv()}\n', mode: FileMode.append);
+  }
+
+  static Future<void> replaceAllTransactions(
+    List<Transaction> transactions,
+  ) async {
+    await _init();
+    final content = transactions.map((t) => t.toCsv()).join('\n');
+    await _dataFile.writeAsString(content);
+  }
+
+  static Future<List<custom_category.Category>> readAllCategories() async {
+    await _init();
+    if (!await _categoriesFile.exists()) return [];
+
+    final lines = await _categoriesFile.readAsLines();
+    final categories = <custom_category.Category>[];
+
+    for (final line in lines) {
+      if (line.trim().isEmpty) continue;
+      try {
+        categories.add(custom_category.Category.fromCsv(line));
+      } catch (e) {
+        if (kDebugMode) {
+          print('Erreur de lecture de la catégorie: $line');
+        }
+      }
+    }
+
+    return categories;
+  }
+
+  static Future<void> addCategory(custom_category.Category c) async {
+    await _init();
+    await _categoriesFile.writeAsString(
+      '${c.toCsv()}\n',
+      mode: FileMode.append,
+    );
+  }
+
+  static Future<void> replaceAllCategories(
+    List<custom_category.Category> categories,
+  ) async {
+    await _init();
+    final content = categories.map((c) => c.toCsv()).join('\n');
+    await _categoriesFile.writeAsString(content);
+  }
+
+  static Future<List<String>> getDesignations(String type) async {
+    final transactions = await readAllTransactions();
+    return transactions
+        .where((t) => t.type == type)
+        .map((t) => t.designation)
+        .toSet()
+        .toList();
+  }
+
+  static Future<String> getCategoryForDesignation(
+    String designation,
+    String type,
+  ) async {
+    final transactions = await readAllTransactions();
+    try {
+      final transaction = transactions.firstWhere(
+        (t) => t.designation == designation && t.type == type,
+      );
+      return transaction.categorie;
+    } catch (e) {
+      return 'Autre';
+    }
   }
 }

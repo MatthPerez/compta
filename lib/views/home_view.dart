@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../constants/colors.dart';
 
 class HomeView extends StatelessWidget {
   const HomeView({super.key});
@@ -8,90 +7,69 @@ class HomeView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 40.0),
+        child: SingleChildScrollView(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // ── Titre ─────────────────────────────────────
-              const Text(
-                'Compta',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                  letterSpacing: 1.2,
+              // Image en haut de l'écran (moitié haute, 75% de la largeur)
+              SizedBox(
+                width: MediaQuery.of(context).size.width * 0.75,
+                height: MediaQuery.of(context).size.height * 0.4,
+                child: Center(
+                  // <-- Centre l'image horizontalement
+                  child: Image.asset(
+                    'lib/assets/pics/cochon_finances.png',
+                    fit: BoxFit
+                        .contain, // <-- Affiche l'image en entier (sans recadrage)
+                  ),
                 ),
               ),
-
+              const SizedBox(
+                height: 20,
+              ), // Espacement entre l'image et le bloc de boutons
+              // Bloc de boutons
               const SizedBox(height: 40),
-
-              // ── Encadré principal ─────────────────────────
-              Center(
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.95,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.all(Radius.circular(20)),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 30,
-                    ),
-                    child: Column(
-                      children: [
-                        // ── Bouton Ajouter une dépense ─────
-                        ElevatedButton.icon(
-                          onPressed: () => context.push('/add-depense'),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Dépense'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: AppColors.textOnPrimary,
-                            minimumSize: const Size(double.infinity, 52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+              // Bloc avec les boutons
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push('/add-data'),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Ajout de données'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                         ),
-
-                        const SizedBox(height: 12),
-
-                        ElevatedButton.icon(
-                          onPressed: () => context.push('/stats'),
-                          icon: const Icon(Icons.bar_chart),
-                          label: const Text('Statistiques'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryDark,
-                            foregroundColor: AppColors.textOnPrimary,
-                            minimumSize: const Size(double.infinity, 52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        ElevatedButton.icon(
-                          onPressed: () => context.push('/import'),
-                          icon: const Icon(Icons.import_export),
-                          label: const Text('Import / Export CSV'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryLight,
-                            foregroundColor: AppColors.textOnPrimary,
-                            minimumSize: const Size(double.infinity, 52),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push('/visualization'),
+                        icon: const Icon(Icons.bar_chart),
+                        label: const Text('Visualisation'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push('/settings'),
+                        icon: const Icon(Icons.settings),
+                        label: const Text('Paramètres'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
