@@ -37,5 +37,6 @@ flutter:
 
   assets:
     - lib/assets/pics/cochon_finances.png
-    - lib/assets/pics/livre_finances.png
+    - lib/assets/pics/compta_icon.png
     - lib/assets/pics/fidelity_card.png
+    - lib/assets/pics/livre_finances.png
