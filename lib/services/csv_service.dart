@@ -5,7 +5,7 @@ import '../models/transaction.dart';
 import '../models/category.dart' as custom_category;
 
 class CsvService {
-  static const String _dataFileName = 'compta.csv';
+  static const String _dataFileName = 'compta.txt';
   static const String _categoriesFileName = 'categories.csv';
   static late Directory _datasDir;
   static late File _dataFile;

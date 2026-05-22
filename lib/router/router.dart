@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../views/home_view.dart';
 import '../views/add_data_view.dart';
 import '../views/visualization_view.dart';
+import '../views/fidelity_view.dart';
 import '../views/settings_view.dart';
 
 void main() {
@@ -35,6 +36,10 @@ class MyApp extends StatelessWidget {
       GoRoute(
         path: '/visualization',
         builder: (context, state) => const VisualizationView(),
+      ),
+      GoRoute(
+        path: '/fidelite',
+        builder: (context, state) => const FidelityView(),
       ),
       GoRoute(
         path: '/settings',

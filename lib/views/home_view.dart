@@ -16,7 +16,7 @@ class HomeView extends StatelessWidget {
                 height: MediaQuery.of(context).size.height * 0.4,
                 child: Center(
                   child: Image.asset(
-                    'lib/assets/pics/cochon_finances.png',
+                    'lib/assets/pics/compta_icon.png',
                     fit: BoxFit.contain,
                   ),
                 ),
@@ -46,6 +46,18 @@ class HomeView extends StatelessWidget {
                         onPressed: () => context.push('/visualization'),
                         icon: const Icon(Icons.bar_chart),
                         label: const Text('Visualisation'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => context.push('/fidelite'),
+                        icon: const Icon(Icons.credit_card),
+                        label: const Text('Cartes de fidélité'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                         ),

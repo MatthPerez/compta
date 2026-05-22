@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+
 import '../models/category.dart';
-import '../services/csv_service.dart';
 import '../services/color_service.dart';
+import '../services/csv_service.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -14,222 +16,376 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  final _categoryController = TextEditingController();
-  final _categoriesTextController = TextEditingController();
-  String _selectedType = 'Dépense';
-  Color _currentColor = ColorService.baseColor;
-  List<Category> _categories = [];
+  final TextEditingController _categoryController = TextEditingController();
+
+  final TextEditingController _categoriesTextController =
+      TextEditingController();
+
   final Uuid _uuid = const Uuid();
+
+  List<Category> _categories = [];
+
   bool _loading = false;
+
+  String _selectedType = 'Dépense';
+
+  Color _currentColor = Colors.deepPurple;
 
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+
+    _initialize();
   }
 
-  Future<void> _loadCategories() async {
-    final categories = await CsvService.readAllCategories();
-    if (mounted) {
+  @override
+  void dispose() {
+    _categoryController.dispose();
+    _categoriesTextController.dispose();
+
+    super.dispose();
+  }
+
+  Future<void> _initialize() async {
+    await _loadSavedColor();
+    await _loadCategories();
+  }
+
+  // ─────────────────────────────────────────────
+  // COULEUR DOMINANTE
+  // ─────────────────────────────────────────────
+
+  Future<void> _loadSavedColor() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final colorValue = prefs.getInt('base_color');
+
+    if (colorValue != null) {
+      final color = Color(colorValue);
+
       setState(() {
-        _categories = categories;
-        _updateCategoriesText();
+        _currentColor = color;
       });
+
+      ColorService.setBaseColor(color);
+    } else {
+      _currentColor = ColorService.baseColor;
     }
   }
 
-  // Met à jour le texte du bloc d'import/export avec les catégories actuelles
+  Future<void> _saveColor(Color color) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setInt('base_color', color.toARGB32());
+
+    ColorService.setBaseColor(color);
+  }
+
+  // ─────────────────────────────────────────────
+  // CATÉGORIES
+  // ─────────────────────────────────────────────
+
+  Future<void> _loadCategories() async {
+    final categories = await CsvService.readAllCategories();
+
+    if (!mounted) return;
+
+    setState(() {
+      _categories = categories;
+    });
+
+    _updateCategoriesText();
+  }
+
   void _updateCategoriesText() {
-    final lines = _categories.map((c) => '${c.name}|${c.type}').toList();
+    final lines = _categories
+        .map((c) => '${c.name}|${c.type}')
+        .toList();
+
     _categoriesTextController.text = lines.join('\n');
   }
 
   Future<void> _addCategory() async {
-    if (_categoryController.text.isEmpty) return;
+    final name = _categoryController.text.trim();
+
+    if (name.isEmpty) {
+      return;
+    }
 
     final category = Category(
       id: _uuid.v4(),
-      name: _categoryController.text.trim(),
+      name: name,
       type: _selectedType,
       colorValue: _currentColor.toARGB32(),
     );
 
     await CsvService.addCategory(category);
-    if (mounted) {
-      _categoryController.clear();
-      await _loadCategories();
-    }
+
+    _categoryController.clear();
+
+    await _loadCategories();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Catégorie ajoutée')),
+    );
   }
 
   Future<void> _importCategories() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+    });
 
     final lines = _categoriesTextController.text.split('\n');
-    final newCategories = <Category>[];
+
+    final importedCategories = <Category>[];
 
     for (final line in lines) {
-      if (line.trim().isEmpty) continue;
-      final parts = line.split('|');
-      if (parts.length != 2) continue;
+      if (line.trim().isEmpty) {
+        continue;
+      }
 
-      newCategories.add(
+      final parts = line.split('|');
+
+      if (parts.length != 2) {
+        continue;
+      }
+
+      importedCategories.add(
         Category(
-          id: _uuid.v4(), // Nouvel ID unique pour chaque catégorie importée
+          id: _uuid.v4(),
           name: parts[0].trim(),
           type: parts[1].trim(),
-          colorValue: _currentColor.toARGB32(), // Couleur par défaut
+          colorValue: _currentColor.toARGB32(),
         ),
       );
     }
 
-    await CsvService.replaceAllCategories(newCategories);
-    if (mounted) {
-      await _loadCategories();
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Catégories importées')));
-    }
+    await CsvService.replaceAllCategories(importedCategories);
+
+    await _loadCategories();
+
+    setState(() {
+      _loading = false;
+    });
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Catégories importées')),
+    );
   }
 
   Future<void> _copyToClipboard() async {
     await Clipboard.setData(
       ClipboardData(text: _categoriesTextController.text),
     );
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copié dans le presse-papiers')),
-      );
-    }
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Copié dans le presse-papiers')),
+    );
   }
+
+  // ─────────────────────────────────────────────
+  // UI
+  // ─────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Paramètres'),
-        backgroundColor: ColorService.baseColor,
+        backgroundColor: _currentColor,
       ),
+
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
+
           children: [
-            // Sélection de la couleur dominante
+            // ───────── COULEUR ─────────
             const Text(
               'Couleur dominante',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 8),
+
+            const SizedBox(height: 12),
+
             GestureDetector(
               onTap: () {
                 showDialog(
                   context: context,
+
                   builder: (context) {
+                    Color tempColor = _currentColor;
+
                     return AlertDialog(
-                      title: const Text('Sélectionner une couleur'),
+                      title: const Text('Choisir une couleur'),
+
                       content: SingleChildScrollView(
                         child: ColorPicker(
                           pickerColor: _currentColor,
+
                           onColorChanged: (color) {
-                            setState(() => _currentColor = color);
-                            ColorService.setBaseColor(color);
+                            tempColor = color;
                           },
                         ),
                       ),
+
                       actions: [
                         TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('OK'),
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+
+                          child: const Text('Annuler'),
+                        ),
+
+                        ElevatedButton(
+                          onPressed: () async {
+                            setState(() {
+                              _currentColor = tempColor;
+                            });
+
+                            await _saveColor(tempColor);
+
+                            if (!mounted) return;
+
+                            Navigator.pop(context);
+                          },
+
+                          child: const Text('Valider'),
                         ),
                       ],
                     );
                   },
                 );
               },
+
               child: Container(
-                height: 50,
+                height: 55,
+
                 decoration: BoxDecoration(
                   color: _currentColor,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+
                 child: const Center(
                   child: Text(
-                    'Appuyez pour choisir une couleur',
-                    style: TextStyle(color: Colors.white),
+                    'Appuyer pour changer la couleur',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
 
-            // Ajout d'une catégorie
+            const SizedBox(height: 32),
+
+            // ───────── AJOUT CATÉGORIE ─────────
             const Text(
               'Ajouter une catégorie',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 8),
+
+            const SizedBox(height: 12),
+
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _categoryController,
-                    decoration: const InputDecoration(
+
+                    decoration: InputDecoration(
                       labelText: 'Nom de la catégorie',
-                      border: OutlineInputBorder(),
+
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+
+                const SizedBox(width: 12),
+
                 DropdownButton<String>(
                   value: _selectedType,
+
                   items: ['Dépense', 'Revenu']
                       .map(
-                        (type) =>
-                            DropdownMenuItem(value: type, child: Text(type)),
+                        (type) => DropdownMenuItem(
+                          value: type,
+                          child: Text(type),
+                        ),
                       )
                       .toList(),
+
                   onChanged: (value) {
-                    setState(() => _selectedType = value!);
+                    if (value == null) return;
+
+                    setState(() {
+                      _selectedType = value;
+                    });
                   },
                 ),
+
                 IconButton(
-                  icon: const Icon(Icons.add),
                   onPressed: _addCategory,
+                  icon: const Icon(Icons.add_circle),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
 
-            // Bloc d'import/export des catégories
+            const SizedBox(height: 32),
+
+            // ───────── IMPORT / EXPORT ─────────
             const Text(
-              'Import/Export des catégories',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Format: category|type (ex: Loyer|Dépense)',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(8),
+              'Import / Export des catégories',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
               ),
-              child: TextField(
-                controller: _categoriesTextController,
-                maxLines: 8,
-                minLines: 5,
-                style: const TextStyle(fontSize: 12),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(8),
+            ),
+
+            const SizedBox(height: 8),
+
+            const Text(
+              'Format : nom|type',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: _categoriesTextController,
+              minLines: 8,
+              maxLines: 14,
+
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 16),
+
             Row(
               children: [
                 Expanded(
@@ -238,18 +394,24 @@ class _SettingsViewState extends State<SettingsView> {
                     child: const Text('Copier'),
                   ),
                 ),
+
                 const SizedBox(width: 12),
+
                 Expanded(
                   child: ElevatedButton(
                     onPressed: _loading ? null : _importCategories,
+
                     child: _loading
-                        ? const CircularProgressIndicator()
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Text('Importer'),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
           ],
         ),
       ),
